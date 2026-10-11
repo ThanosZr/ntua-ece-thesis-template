@@ -1,0 +1,26 @@
+\begin{longtable}{@{}r>{\raggedright}p{0.47\linewidth}lrrl@{}}
+\toprule
+\# & \textbf{Σενάριο} & \textbf{Μηχανή} & \textbf{Χρόνος} & \textbf{Σελ.} & \\
+\midrule\endhead
+01 & Το main.tex όπως διανέμεται (plain, noindex) & pdfLaTeX & 5.7\,s & 70 & \PASS\\
+02 & Όλες οι επιλογές (TikZ, υδατογράφημα, ευρετήριο) + κεφάλαιο ελέγχου με \verb|\en{}| & pdfLaTeX & 15.2\,s & 80 & \PASS\\
+03 & Όλες οι επιλογές, αγγλικά \emph{χωρίς} \verb|\en{}| & XeLaTeX & 11.5\,s & 80 & \PASS\\
+04 & Όλες οι επιλογές, αγγλικά \emph{χωρίς} \verb|\en{}| & LuaLaTeX & 22.0\,s & 80 & \PASS\\
+05 & Γραμματοσειρά classic & pdfLaTeX & 16.7\,s & 80 & \PASS\\
+06 & Γραμματοσειρά classic, χωρίς \verb|\en{}| & XeLaTeX & 12.1\,s & 80 & \PASS\\
+07 & Ασπρόμαυρη έκδοση (printer), χωρίς hyperref & XeLaTeX & 10.3\,s & 80 & \PASS\\
+08 & Ελάχιστες επιλογές (μόνο modern) & pdfLaTeX & 12.6\,s & 79 & \PASS\\
+09 & Δύο φοιτητές, λατινικά ονόματα, μεγάλος τίτλος, κενός υπότιτλος & XeLaTeX & 11.0\,s & 78 & \PASS\\
+10 & Δύο φοιτητές, λατινικά ονόματα, μεγάλος τίτλος, κενός υπότιτλος & pdfLaTeX & 15.4\,s & 78 & \PASS\\
+11 & Εικόνα εξωφύλλου σε TikZ (κώδικας με «;») & pdfLaTeX & 14.9\,s & 78 & \PASS\\
+12 & Εικόνα εξωφύλλου σε TikZ (κώδικας με «;») & LuaLaTeX & 21.6\,s & 78 & \PASS\\
+13 & Δική μας γραμματοσειρά (\verb|\setmainfont|, CMU Serif) & XeLaTeX & 12.0\,s & 80 & \PASS\\
+14 & Αλλαγή compiler με παλιά βοηθητικά αρχεία & pdfLaTeX → XeLaTeX & 23.1\,s & 80 & \PASS\\
+15 & Αλλαγή compiler με παλιά βοηθητικά αρχεία & XeLaTeX → pdfLaTeX & 22.5\,s & 80 & \PASS\\
+16 & Παλιό στυλ: παντού \verb|\en{}| & XeLaTeX & 11.1\,s & 80 & \PASS\\
+17 & Το main.tex όπως διανέμεται (plain, noindex) & LuaLaTeX & 9.1\,s & 70 & \PASS\\
+18 & Μόνο λατινικό ονοματεπώνυμο, χωρίς εικόνα εξωφύλλου & XeLaTeX & 10.7\,s & 78 & \PASS\\
+19 & Μόνο λατινικό ονοματεπώνυμο, χωρίς εικόνα εξωφύλλου & pdfLaTeX & 15.1\,s & 78 & \PASS\\
+\bottomrule
+\end{longtable}
+\noindent Αποτέλεσμα: \textbf{19 από 19} σενάρια πέρασαν. Ο χρόνος είναι για πλήρη μεταγλώττιση από την αρχή (όλα τα περάσματα, BibTeX, ευρετήριο).
