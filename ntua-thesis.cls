@@ -449,8 +449,10 @@
         \vspace{0.1cm}
         %
         \vfill
-        \huge \textcolor{\colouredtextcolor}{\textsc{\textscale{\chapterTitleScaleFactor}{%
-            \@translator}}}
+        % \textsc innermost: with XeLaTeX/LuaLaTeX \textsc must see the
+        % letters themselves to turn them into Greek small capitals
+        \huge \textcolor{\colouredtextcolor}{\textscale{\chapterTitleScaleFactor}{%
+            \textsc{\@translator}}}
         \\[3mm]
         \normalsize \textcolor{black}{\@toutis}
         \\[3mm]
