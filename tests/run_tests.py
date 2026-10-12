@@ -154,6 +154,14 @@ def checks_for(workdir, engine, expect, forbid, strict_fonts):
     for s in forbid:
         if s in norm:
             fails.append("forbidden text found: %r" % s)
+    # The class strings of the "modern" option are written without accents
+    # because they are typeset in small capitals. With XeLaTeX/LuaLaTeX
+    # \textsc must see the letters themselves (\textsc{\textscale{..}{..}}
+    # left the cover label as "Διπλωματικη Εργασια", lowercase, no tonos).
+    if engine != "pdf":
+        for s in ["Διπλωματικη Εργασια", "Εθνικο Μετσοβιο", "Σχολη Ηλεκτρολογων"]:
+            if s in norm:
+                fails.append("Greek small capitals lost: %r" % s)
     return fails
 
 
