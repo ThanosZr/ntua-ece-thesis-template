@@ -38,7 +38,8 @@
 2. Γράψτε στα αρχεία του νέου repository: ανοίξτε ένα αρχείο, πατήστε το μολύβι
    (ή το πλήκτρο `.` για πλήρη editor) και μετά **Commit changes**.
 3. Σε κάθε commit το **Actions → Build PDF** κάνει compile με XeLaTeX, σε περίπου 2 λεπτά.
-4. Το PDF: **Releases → pdf → thesis.pdf** (ή στο run του Actions, στα Artifacts).
+4. Το PDF: **Releases → pdf → thesis.pdf**, και το ασπρόμαυρο για τη βιβλιοθήκη
+   **thesis-bw.pdf** (ή στο run του Actions, στα Artifacts).
 
 ## Πού γράφετε το κείμενό σας
 
@@ -75,6 +76,14 @@ python compile.py
 ή [TeX Live](https://tug.org/texlive/), ή [MacTeX](https://tug.org/mactex/) στο
 macOS. Αν δεν βρει TeX, λέει τι να εγκαταστήσετε. Χωρίς σελίδα:
 `python compile.py --once` (επιλογές: `--engine pdflatex`, `--clean`).
+
+### Ασπρόμαυρο PDF για τη βιβλιοθήκη
+
+Κάντε compile το `main-bw.tex` αντί για το `main.tex` (στο Overleaf: Menu → Main
+document). Βγαίνει το `main-bw.pdf`, με τα χρώματα του προτύπου σε γκρι (επιλογή
+`printer`), χωρίς αλλαγή στο `main.tex`. Ο offline compiler (κουμπί «Ασπρόμαυρο PDF»
+ή `python compile.py --once --bw`) και το GitHub (`thesis-bw.pdf` στα Releases)
+περνούν το PDF και από Ghostscript, ώστε να γίνουν γκρι και οι εικόνες.
 
 ### Από τερματικό
 

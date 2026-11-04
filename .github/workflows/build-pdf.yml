@@ -1,10 +1,13 @@
 name: Build PDF
 
-# Compiles main.tex with XeLaTeX (full TeX Live) on every push and pull request.
-# The PDF is kept with each run (Actions -> the run -> Artifacts). For the
-# default branch it is also published as the release "pdf", so the latest
-# version can always be downloaded from:
+# Compiles main.tex with XeLaTeX (full TeX Live) on every push and pull request,
+# and a black-and-white copy for the library (main-bw.tex: the class option
+# "printer", then Ghostscript turns the figures grey too).
+# The PDFs are kept with each run (Actions -> the run -> Artifacts). For the
+# default branch they are also published as the release "pdf", so the latest
+# versions can always be downloaded from:
 #   https://github.com/<owner>/<repo>/releases/download/pdf/thesis.pdf
+#   https://github.com/<owner>/<repo>/releases/download/pdf/thesis-bw.pdf
 # GitHub Pages is not affected: it keeps publishing docs/ as before.
 
 on:
@@ -35,11 +38,26 @@ jobs:
       - name: Name the PDF
         run: cp main.pdf thesis.pdf
 
-      - name: Keep the PDF with this run
+      - name: Compile main-bw.tex (black and white) with XeLaTeX
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: main-bw.tex
+          latexmk_use_xelatex: true
+
+      - name: Make the figures of the black-and-white copy grey too
+        run: |
+          command -v gs > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ghostscript > /dev/null; }
+          gs -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite \
+            -sColorConversionStrategy=Gray -dProcessColorModel=/DeviceGray \
+            -dCompatibilityLevel=1.5 -o thesis-bw.pdf main-bw.pdf
+
+      - name: Keep the PDFs with this run
         uses: actions/upload-artifact@v4
         with:
           name: thesis-pdf
-          path: thesis.pdf
+          path: |
+            thesis.pdf
+            thesis-bw.pdf
 
       - name: Publish the PDF as the release "pdf"
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
@@ -47,6 +65,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete pdf --cleanup-tag --yes || true
-          gh release create pdf thesis.pdf --target "$GITHUB_SHA" \
+          gh release create pdf thesis.pdf thesis-bw.pdf --target "$GITHUB_SHA" \
             --title "PDF (latest build)" \
-            --notes "thesis.pdf compiled from main.tex at commit $GITHUB_SHA."
+            --notes "thesis.pdf compiled from main.tex, and thesis-bw.pdf, the black-and-white copy for the library, at commit $GITHUB_SHA."

@@ -12,6 +12,7 @@
   python compile.py                     ανοίγει τη σελίδα στον browser
   python compile.py --once              ένα compile χωρίς σελίδα
   python compile.py --once --engine pdflatex
+  python compile.py --once --bw         ασπρόμαυρο PDF για τη βιβλιοθήκη (main-bw.pdf)
   python compile.py --main other.tex    άλλο κύριο αρχείο αντί για main.tex
 
 Στα Windows αρκεί και διπλό κλικ στο αρχείο. Για να σταματήσει, κλείνεις το
@@ -67,7 +68,8 @@ def _extra_bin_dirs():
     if sys.platform == "win32":
         local = os.environ.get("LOCALAPPDATA", "")
         pf = os.environ.get("ProgramFiles", r"C:\Program Files")
-        pats += [r"C:\texlive\*\bin\windows", r"C:\texlive\*\bin\win64",
+        pats += [os.path.join(pf, "gs", "gs*", "bin"),
+                 r"C:\texlive\*\bin\windows", r"C:\texlive\*\bin\win64",
                  r"C:\texlive\*\bin\win32",
                  os.path.join(local, "Programs", "MiKTeX", "miktex", "bin", "x64"),
                  os.path.join(pf, "MiKTeX", "miktex", "bin", "x64")]
@@ -98,6 +100,14 @@ def _popen_kwargs():
     if sys.platform == "win32":
         kw["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
     return kw
+
+
+def find_gs():
+    for name in ("gs", "gswin64c", "gswin32c"):
+        p = which(name)
+        if p:
+            return p
+    return None
 
 
 def _kill_tree(p):
@@ -139,6 +149,8 @@ class Compiler:
         self.main_path = os.path.abspath(main_path)
         self.root = os.path.dirname(self.main_path)
         self.base = os.path.splitext(os.path.basename(self.main_path))[0]
+        self.job = self.base            # main, or main-bw while the B/W copy compiles
+        self.bw_job = self.base + "-bw"
         _ROOT[0] = self.root
         self.tex = find_tex()
         self.lock = threading.Lock()
@@ -148,6 +160,7 @@ class Compiler:
         self.result = None
         self.pdf_bytes = None
         self.pdf_version = 0
+        self.bw_version = 0
         self.bib_failed = False
         self.proc = None
         self.cancelled = False
@@ -164,7 +177,7 @@ class Compiler:
     def source_stamp(self):
         """Changes whenever the student saves a source file or adds a figure."""
         newest, count = 0.0, 0
-        out_pdf = os.path.normcase(self.path(self.base + ".pdf"))
+        outputs = {os.path.normcase(self.path(j + ".pdf")) for j in (self.base, self.bw_job)}
         for base, dirs, files in os.walk(self.root):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
             for f in files:
@@ -172,7 +185,7 @@ class Compiler:
                 if ext not in SOURCE_EXTS or f.endswith("-converted-to.pdf"):
                     continue
                 full = os.path.join(base, f)
-                if os.path.normcase(full) == out_pdf:
+                if os.path.normcase(full) in outputs:
                     continue
                 try:
                     newest = max(newest, os.path.getmtime(full))
@@ -182,7 +195,7 @@ class Compiler:
         return "%d-%d" % (int(newest * 1000), count)
 
     def _aux_files(self):
-        files = [self.path(self.base + "." + e) for e in ("aux", "toc", "lof", "lot", "out")]
+        files = [self.path(self.job + "." + e) for e in ("aux", "toc", "lof", "lot", "out")]
         for base, dirs, names in os.walk(self.root):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
             files += [os.path.join(base, n) for n in names
@@ -215,14 +228,14 @@ class Compiler:
 
     def _needs_bibtex(self):
         try:
-            with open(self.path(self.base + ".aux"), "rb") as f:
+            with open(self.path(self.job + ".aux"), "rb") as f:
                 return b"\\bibdata" in f.read()
         except OSError:
             return False
 
     def clean(self):
         removed = 0
-        names = [self.base + "." + e for e in AUX_EXTS]
+        names = [j + "." + e for j in (self.base, self.bw_job) for e in AUX_EXTS]
         names += [n + "." + e for n in INDEX_NAMES for e in ("idx", "ind", "ilg")]
         for n in names:
             p = self.path(n)
@@ -267,28 +280,29 @@ class Compiler:
         if p is not None and p.poll() is None:
             _kill_tree(p)
 
-    def compile(self, engine="xelatex", clean=False):
+    def compile(self, engine="xelatex", clean=False, bw=False):
         with self.lock:
             if self.running:
                 return False
             self.running = True
             self.started = time.time()
             self.step = "Ξεκινά"
-        threading.Thread(target=self._compile, args=(engine, clean), daemon=True).start()
+        threading.Thread(target=self._compile, args=(engine, clean, bw), daemon=True).start()
         return True
 
-    def compile_sync(self, engine="xelatex", clean=False):
+    def compile_sync(self, engine="xelatex", clean=False, bw=False):
         with self.lock:
             self.running = True
             self.started = time.time()
-        self._compile(engine, clean)
+        self._compile(engine, clean, bw)
         return self.result
 
-    def _compile(self, engine, clean):
+    def _compile(self, engine, clean, bw=False):
+        self.job = self.bw_job if bw else self.base
         stamp = self.source_stamp()
         steps, out_all = [], []
         ok, errors, warnings, log_tail = False, [], [], ""
-        bib_problems = []
+        bib_problems, greyed = [], False
         try:
             self.tex = find_tex()
             exe = self.tex["engines"].get(engine)
@@ -308,7 +322,14 @@ class Compiler:
             if clean:
                 self.clean()
             cmd = [exe, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error",
-                   "-synctex=1", self.base + ".tex"]
+                   "-synctex=1"]
+            if bw:
+                # The class option "printer" gives the black-and-white copy, as
+                # main-bw.pdf, without touching main.tex.
+                cmd += ["-jobname=" + self.bw_job,
+                        "\\PassOptionsToClass{printer}{ntua-thesis}\\input{%s.tex}" % self.base]
+            else:
+                cmd += [self.base + ".tex"]
             name = ENGINE_NAMES[engine]
             ran_bibtex = False
             for n in range(1, MAX_RUNS + 1):
@@ -326,10 +347,10 @@ class Compiler:
                 if self._needs_bibtex() and self.tex["bibtex"] and (
                         not ran_bibtex and (
                             clean or self.bib_failed
-                            or not os.path.isfile(self.path(self.base + ".bbl"))
+                            or not os.path.isfile(self.path(self.job + ".bbl"))
                             or self._citations_digest() != cites_before
                             or self._bib_newer())):
-                    rc, out = self._run([self.tex["bibtex"], self.base], "BibTeX")
+                    rc, out = self._run([self.tex["bibtex"], self.job], "BibTeX")
                     steps.append("BibTeX")
                     out_all.append(out)
                     if self.cancelled:
@@ -338,7 +359,7 @@ class Compiler:
                     ran_bibtex = True
                     self.bib_failed = rc >= 2
                     if self.bib_failed:
-                        bib_problems = parse_blg(self.path(self.base + ".blg"))
+                        bib_problems = parse_blg(self.path(self.job + ".blg"))
                     continue
                 log = self._read_log()
                 if self._digest(self._aux_files()) == before and not re.search(
@@ -346,8 +367,28 @@ class Compiler:
                     break
             ok = True
             warnings = bib_problems + parse_warnings(self._read_log())
-            pdf = self.path(self.base + ".pdf")
-            if os.path.isfile(pdf):
+            pdf = self.path(self.job + ".pdf")
+            if os.path.isfile(pdf) and bw:
+                gs = find_gs()
+                if gs:
+                    # figures too: Ghostscript turns every colour into grey
+                    tmp = self.path(self.job + "-grey.pdf")
+                    rc, out = self._run([gs, "-q", "-dNOPAUSE", "-dBATCH", "-dSAFER",
+                                         "-sDEVICE=pdfwrite", "-sColorConversionStrategy=Gray",
+                                         "-dProcessColorModel=/DeviceGray", "-dCompatibilityLevel=1.5",
+                                         "-o", tmp, pdf], "Ghostscript: γκρι εικόνες")
+                    steps.append("Ghostscript")
+                    if rc == 0 and os.path.isfile(tmp):
+                        os.replace(tmp, pdf)
+                        greyed = True
+                    else:
+                        warnings = ["Το Ghostscript δεν μπόρεσε να κάνει γκρι τις εικόνες· το PDF "
+                                    "έχει μόνο τα στοιχεία του προτύπου ασπρόμαυρα."] + warnings
+                else:
+                    warnings = ["Οι εικόνες έμειναν όπως είναι: για να γίνουν κι αυτές γκρι, "
+                                "εγκαταστήστε το Ghostscript (ghostscript.com)."] + warnings
+                self.bw_version += 1
+            elif os.path.isfile(pdf):
                 with open(pdf, "rb") as f:
                     self.pdf_bytes = f.read()
                 self.pdf_version += 1
@@ -364,9 +405,11 @@ class Compiler:
                 log_tail += ("\n\n----- Έξοδος του τελευταίου βήματος "
                              "(τελευταίες γραμμές) -----\n" + tail)
             self.result = {"ok": ok and not errors, "engine": engine, "steps": steps,
+                           "bw": bw, "greyed": greyed,
                            "seconds": round(time.time() - self.started, 1),
                            "errors": errors, "warnings": warnings, "log": log_tail,
                            "stamp": stamp, "finished": time.time()}
+            self.job = self.base
             self.running = False
             self.step = ""
 
@@ -475,12 +518,14 @@ class Compiler:
         return errors
 
     def _last_engine(self):
-        """Which engine wrote the current main.log, from its first line."""
-        try:
-            with open(self.path(self.base + ".log"), "rb") as f:
-                first = f.readline().decode("utf-8", "replace")
-        except OSError:
+        """The engine of the last compile, normal or B/W: they share the
+        chapters' .aux files. Read from the first line of the newest log."""
+        logs = [self.path(j + ".log") for j in (self.base, self.bw_job)]
+        logs = sorted((l for l in logs if os.path.isfile(l)), key=os.path.getmtime)
+        if not logs:
             return None
+        with open(logs[-1], "rb") as f:
+            first = f.readline().decode("utf-8", "replace")
         if first.startswith("This is pdfTeX"):
             return "pdflatex"
         if first.startswith("This is XeTeX"):
@@ -490,7 +535,7 @@ class Compiler:
         return None
 
     def _bib_newer(self):
-        bbl = self.path(self.base + ".bbl")
+        bbl = self.path(self.job + ".bbl")
         try:
             t = os.path.getmtime(bbl)
         except OSError:
@@ -499,7 +544,7 @@ class Compiler:
 
     def _read_log(self):
         try:
-            with open(self.path(self.base + ".log"), "rb") as f:
+            with open(self.path(self.job + ".log"), "rb") as f:
                 return f.read().decode("utf-8", "replace")
         except OSError:
             return ""
@@ -517,6 +562,8 @@ class Compiler:
             "running": self.running, "step": self.step,
             "elapsed": round(time.time() - self.started, 1) if self.running else 0,
             "result": r, "pdf_version": self.pdf_version if self.pdf_bytes else 0,
+            "bw_version": self.bw_version if os.path.isfile(self.path(self.bw_job + ".pdf")) else 0,
+            "gs": bool(find_gs()),
             "stamp": self.source_stamp(),
         }
 
@@ -706,6 +753,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
 .err .msg{margin:4px 0 0;font-weight:500}
 .err code{display:block;margin-top:6px;font:12.5px/1.45 var(--mono);background:var(--paper);border-radius:4px;padding:6px 8px;overflow-wrap:anywhere;white-space:pre-wrap}
 .err .hint{margin:6px 0 0;font-size:13.5px;color:var(--muted)}
+#export .hint{margin:8px 0 0;font-size:13px;color:var(--muted)}
 .slow{margin:-6px 0 0;font-size:13.5px;color:var(--muted)}
 .warn{font-size:13.5px;color:var(--muted)} .warn ul{margin:6px 0 0;padding-left:18px}
 details summary{cursor:pointer;color:var(--muted);font-size:13.5px}
@@ -738,6 +786,12 @@ a{color:var(--brown-ink)}
   <div class="buttons" id="pdfbtns" hidden>
     <a class="btn" id="openpdf" href="/pdf" target="_blank" rel="noopener">Άνοιγμα PDF σε νέα καρτέλα</a>
   </div>
+  <div class="card" id="export" hidden><h3>Εξαγωγή</h3>
+    <div class="buttons"><button id="bw">Ασπρόμαυρο PDF</button>
+      <a class="btn" id="openbw" href="/pdf-bw" target="_blank" rel="noopener" hidden>Άνοιγμα</a></div>
+    <p class="hint" id="bwnote">Για τη βιβλιοθήκη και την εκτύπωση: τα χρώματα του προτύπου γίνονται γκρι
+      (επιλογή <code>printer</code>), χωρίς αλλαγή στο main.tex. Βγαίνει ως main-bw.pdf στον φάκελο.<span></span></p>
+  </div>
   <details id="logbox" hidden><summary>Πλήρες log</summary><pre class="log" id="log"></pre></details>
 </aside>
 <section class="preview">
@@ -766,9 +820,10 @@ async function api(path, body) {
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }
-function compile(clean) {
-  api("/api/compile", {engine: engine, clean: !!clean}).then(draw).catch(() => {});
+function compile(clean, bw) {
+  api("/api/compile", {engine: engine, clean: !!clean, bw: !!bw}).then(draw).catch(() => {});
 }
+$("bw").onclick = () => compile(false, true);
 $("go").onclick = () => compile(false);
 $("clean").onclick = () => compile(true);
 $("stop").onclick = () => api("/api/stop", {}).then(draw).catch(() => {});
@@ -811,6 +866,10 @@ function draw(s) {
   drawTex(s.tex); drawEngines(s.tex);
   const noTex = !s.tex.engines.length;
   $("go").disabled = s.running || noTex;
+  $("bw").disabled = s.running || noTex;
+  $("export").hidden = noTex;
+  $("openbw").hidden = !s.bw_version; $("openbw").href = "/pdf-bw?v=" + s.bw_version;
+  $("bwnote").lastChild.textContent = s.gs ? " Οι εικόνες γίνονται κι αυτές γκρι (Ghostscript)." : " Οι εικόνες μένουν όπως είναι: για να γίνουν κι αυτές γκρι χρειάζεται το Ghostscript.";
   $("clean").disabled = s.running || noTex;
   $("go").textContent = s.running ? "Compile…" : "Compile";
   $("stop").hidden = !s.running; $("clean").hidden = s.running;
@@ -827,7 +886,7 @@ function draw(s) {
   } else if (r) {
     const when = new Date(r.finished * 1000).toLocaleTimeString("el-GR");
     const steps = r.steps.length ? " · " + summarize(r.steps) : "";
-    $("statustext").textContent = (r.ok ? "Έτοιμο σε " + fmt(r.seconds) + " s" : "Σφάλμα") + steps + " · " + when;
+    $("statustext").textContent = (r.ok ? (r.bw ? "Ασπρόμαυρο PDF έτοιμο σε " : "Έτοιμο σε ") + fmt(r.seconds) + " s" : "Σφάλμα") + steps + " · " + when;
   }
   if (r !== null && JSON.stringify(r) !== lastResult) {
     lastResult = JSON.stringify(r);
@@ -911,6 +970,14 @@ def make_handler(comp, token, port):
                                       "text/plain; charset=utf-8")
                 return self._send(200, comp.pdf_bytes, "application/pdf",
                                   {"Content-Disposition": 'inline; filename="%s.pdf"' % comp.base})
+            if path == "/pdf-bw":
+                f = comp.path(comp.bw_job + ".pdf")
+                if not os.path.isfile(f):
+                    return self._send(404, "Δεν υπάρχει ακόμα ασπρόμαυρο PDF.".encode("utf-8"),
+                                      "text/plain; charset=utf-8")
+                with open(f, "rb") as fh:
+                    return self._send(200, fh.read(), "application/pdf",
+                                      {"Content-Disposition": 'inline; filename="%s.pdf"' % comp.bw_job})
             if path == "/api/state":
                 if not self._api_ok():
                     return self._json({"error": "forbidden"}, 403)
@@ -930,7 +997,7 @@ def make_handler(comp, token, port):
                 return self._json(comp.state())
             if urlparse(self.path).path == "/api/compile":
                 engine = data.get("engine") if data.get("engine") in ENGINE_NAMES else "xelatex"
-                comp.compile(engine, bool(data.get("clean")))
+                comp.compile(engine, bool(data.get("clean")), bool(data.get("bw")))
                 return self._json(comp.state())
             return self._json({"error": "not found"}, 404)
 
@@ -974,6 +1041,7 @@ def main():
                     help="μηχανή για το --once (προεπιλογή: xelatex)")
     ap.add_argument("--once", action="store_true", help="ένα compile χωρίς σελίδα")
     ap.add_argument("--clean", action="store_true", help="με το --once: σβήνει πρώτα τα βοηθητικά αρχεία")
+    ap.add_argument("--bw", action="store_true", help="με το --once: ασπρόμαυρο PDF (main-bw.pdf)")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--no-browser", action="store_true", help="να μην ανοίξει ο browser")
     args = ap.parse_args()
@@ -988,10 +1056,11 @@ def main():
     comp = Compiler(main_tex)
 
     if args.once:
-        r = comp.compile_sync(args.engine, args.clean)
+        r = comp.compile_sync(args.engine, args.clean, args.bw)
         steps = ", ".join(r["steps"])
         if r["ok"]:
-            print("OK σε %s s (%s): %s" % (r["seconds"], steps, comp.path(comp.base + ".pdf")))
+            out = comp.bw_job if args.bw else comp.base
+            print("OK σε %s s (%s): %s" % (r["seconds"], steps, comp.path(out + ".pdf")))
             for w in r["warnings"][:10]:
                 print("  προειδοποίηση: " + w)
             return 0

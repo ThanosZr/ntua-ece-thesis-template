@@ -1,0 +1,12 @@
+% Ασπρόμαυρη έκδοση της εργασίας, για τη βιβλιοθήκη και την εκτύπωση.
+%
+% Κάντε compile αυτό το αρχείο αντί για το main.tex: βγαίνει το main-bw.pdf, με
+% τα χρώματα του προτύπου σε γκρι (επιλογή printer της κλάσης), χωρίς καμία
+% αλλαγή στο main.tex.
+%   Overleaf:  Menu → Main document: main-bw.tex → Recompile
+%   Τερματικό: latexmk -xelatex main-bw.tex
+% Τις εικόνες δεν τις αλλάζει. Ο offline compiler (κουμπί «Ασπρόμαυρο PDF») και
+% το GitHub (thesis-bw.pdf) περνούν το PDF και από Ghostscript, ώστε να γίνουν
+% γκρι και οι εικόνες.
+\PassOptionsToClass{printer}{ntua-thesis}
+\input{main.tex}

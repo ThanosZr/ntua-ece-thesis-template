@@ -258,7 +258,8 @@
               <strong>Commit changes</strong>.</div></li>
             <li><div><b>Βγάζεις το PDF</b>Σε κάθε commit το GitHub κάνει compile μόνο του, σε
               περίπου 2 λεπτά (φαίνεται στο <strong>Actions</strong>). Το PDF:
-              <strong>Releases → pdf → thesis.pdf</strong>.</div></li>
+              <strong>Releases → pdf → thesis.pdf</strong>, και ασπρόμαυρο για τη βιβλιοθήκη:
+              <strong>thesis-bw.pdf</strong>.</div></li>
           </ol>
           <p class="note">Χωρίς εγκατάσταση. Στα ιδιωτικά repositories κάθε compile
             μετράει στα δωρεάν λεπτά του μήνα του λογαριασμού σου.</p>
@@ -273,7 +274,8 @@
             <li><div><b>Γράφεις</b>Σε όποιον editor θες, π.χ. VS Code ή Notepad++.</div></li>
             <li><div><b>Βγάζεις το PDF</b>Άνοιξε τον offline compiler: <code>python&nbsp;compile.py</code>
               στον φάκελο του προτύπου (στα Windows και με διπλό κλικ). Ανοίγει στον browser, με κουμπί
-              <strong>Compile</strong>, τα σφάλματα με τη γραμμή τους και το PDF δίπλα.</div></li>
+              <strong>Compile</strong>, τα σφάλματα με τη γραμμή τους και το PDF δίπλα, και κουμπί
+              <strong>Ασπρόμαυρο PDF</strong> για τη βιβλιοθήκη.</div></li>
           </ol>
           <p class="route-action"><a class="btn ghost" href="compile.py" download>Offline compiler</a></p>
           <p class="note">Το <code>compile.py</code> υπάρχει ήδη μέσα στο ZIP. Θέλει <a href="https://www.python.org/downloads/">Python</a>
@@ -319,6 +321,11 @@
           </ol>
         </div>
         <div>
+          <h3>Ασπρόμαυρο PDF για τη βιβλιοθήκη</h3>
+          <p>Κάντε compile το <code>main-bw.tex</code> αντί για το <code>main.tex</code> (Overleaf:
+            Menu → Main document). Βγαίνει το <code>main-bw.pdf</code>, με τα χρώματα του προτύπου
+            σε γκρι, χωρίς αλλαγή στο <code>main.tex</code>. Ο offline compiler και το GitHub κάνουν
+            γκρι και τις εικόνες, με Ghostscript.</p>
           <h3>Άλλες μηχανές</h3>
           <pre><code>latexmk -xelatex main.tex   # προτείνεται
 latexmk -pdf main.tex       # pdfLaTeX

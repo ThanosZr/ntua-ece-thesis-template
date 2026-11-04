@@ -31,7 +31,7 @@ SHIPPED_OPTS = "modern,hyperref,watermark,histinit,noindex,plain,newlogo"
 FULL_OPTS = "modern,hyperref,watermark,histinit,newlogo"
 ENGINES = [("pdf", "pdfLaTeX", "pdflatex"), ("xe", "XeLaTeX", "xelatex"),
            ("lua", "LuaLaTeX", "lualatex")]
-TEMPLATE_FILES = ["main.tex", "ntua-thesis.cls", "ntua.bst", "references.bib",
+TEMPLATE_FILES = ["main.tex", "main-bw.tex", "ntua-thesis.cls", "ntua.bst", "references.bib",
                   "compile.py", "LICENSE", "README.md"]
 TEMPLATE_DIRS = ["front_matter", "body_matter", "back_matter", "figures", "logo"]
 
