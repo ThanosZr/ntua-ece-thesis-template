@@ -32,6 +32,34 @@
 - Για την τελική έκδοση (με γραφικά TikZ και ευρετήριο) αφαιρέστε τα
   `plain,noindex` και κάντε compile τοπικά ή με premium λογαριασμό.
 
+## Στο GitHub, χωρίς εγκατάσταση
+
+1. **Use this template → Create a new repository** (μπορεί να είναι Private).
+2. Γράψτε στα αρχεία του νέου repository: ανοίξτε ένα αρχείο, πατήστε το μολύβι
+   (ή το πλήκτρο `.` για πλήρη editor) και μετά **Commit changes**.
+3. Σε κάθε commit το **Actions → Build PDF** κάνει compile με XeLaTeX, σε περίπου 2 λεπτά.
+4. Το PDF: **Releases → pdf → thesis.pdf** (ή στο run του Actions, στα Artifacts).
+
+## Πού γράφετε το κείμενό σας
+
+Το πρότυπο έχει ήδη μια εργασία-παράδειγμα. Σβήνετε το κείμενό της και γράφετε
+το δικό σας στα ίδια αρχεία:
+
+| Τι                               | Αρχείο |
+|----------------------------------|--------|
+| Τίτλος, όνομα, επιβλέπων         | `main.tex`, στην αρχή: `\title{…}`, `\authorNameGR{…}`, `\supervisor{…}` κ.λπ. |
+| Περίληψη, ευχαριστίες, πρόλογος  | `front_matter/abstract.tex`, `acknowledgements.tex`, `preface.tex` |
+| Κεφάλαια                         | `body_matter/intro.tex`, `chap2.tex` … `chap9.tex` |
+| Παραρτήματα                      | `back_matter/appA.tex` … `appE.tex` |
+| Εικόνες                          | φάκελος `figures/` |
+| Βιβλιογραφία                     | `references.bib` |
+
+- Λιγότερα ή περισσότερα κεφάλαια: σβήνετε ή προσθέτετε γραμμές
+  `\include{body_matter/…}` στο τέλος του `main.tex`.
+- Έχετε ήδη κείμενο σε LaTeX; Αντιγράφετε μόνο το περιεχόμενο κάθε κεφαλαίου στο
+  αντίστοιχο αρχείο, χωρίς `\documentclass` και `\begin{document}`. Όσα
+  `\usepackage{…}` χρειάζεται μπαίνουν στο `main.tex`, μετά το `\documentclass`.
+
 ## Τοπικά (TeX Live 2023+ ή MiKTeX)
 
 ```bash
