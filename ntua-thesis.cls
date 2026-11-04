@@ -56,6 +56,11 @@
 	\providecommand{\EnsureStandardFontEncoding}{\@firstofone}
 	\providecommand{\bbl@greek@roman}[1]{\romannumeral#1}
 	\providecommand{\bbl@greek@Roman}[1]{\@Roman{#1}}
+	% Newer babel-greek (e.g. MiKTeX 2025+) also writes appendix numbers
+	% as \LGR\textAlpha\LGR\textdexiakeraia, even in link names.
+	\AtBeginDocument{%
+		\providecommand{\LGR}{}%
+		\providecommand{\textdexiakeraia}{ʹ}}
 	% babel-greek writes its captions with LGR commands (\textPi...);
 	% plain Unicode text lets headings, small caps and PDF bookmarks
 	% treat them as normal text.
