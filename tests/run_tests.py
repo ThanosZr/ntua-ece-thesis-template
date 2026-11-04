@@ -113,7 +113,7 @@ def checks_for(workdir, engine, expect, forbid, strict_fonts):
             fails.append("font shape substitutions: %s" % subs[:5])
 
     # TeX bitmap fonts (.pk) look blurry and are rejected by some archives.
-    # (The sample figure peerArchitecture.eps carries its own Type 3 font,
+    # (The sample figure peerArchitecture.pdf carries its own Type 3 font,
     # which is part of the figure, not of the class, so only .pk is checked.)
     pk = sorted(set(re.findall(r"([\w-]+)\.\d+pk", log)))
     if pk:
