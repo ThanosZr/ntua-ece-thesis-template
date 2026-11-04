@@ -299,6 +299,12 @@ class Compiler:
                                        "ή διάλεξε άλλη μηχανή."})
                 return
             self.cancelled = False
+            prev = self._last_engine()
+            if not clean and prev and prev != engine:
+                # .aux/.toc written by another engine can contain commands this
+                # one does not know (e.g. pdfLaTeX's \\LGR for XeLaTeX)
+                clean = True
+                steps.append("Καθαρισμός (άλλαξε μηχανή)")
             if clean:
                 self.clean()
             cmd = [exe, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error",
@@ -468,6 +474,21 @@ class Compiler:
             self._find_line(e, pat)
         return errors
 
+    def _last_engine(self):
+        """Which engine wrote the current main.log, from its first line."""
+        try:
+            with open(self.path(self.base + ".log"), "rb") as f:
+                first = f.readline().decode("utf-8", "replace")
+        except OSError:
+            return None
+        if first.startswith("This is pdfTeX"):
+            return "pdflatex"
+        if first.startswith("This is XeTeX"):
+            return "xelatex"
+        if first.startswith(("This is LuaHBTeX", "This is LuaTeX")):
+            return "lualatex"
+        return None
+
     def _bib_newer(self):
         bbl = self.path(self.base + ".bbl")
         try:
@@ -503,7 +524,9 @@ class Compiler:
 # --------------------------------------------------------------------------
 # Reading the log: errors with file and line, in plain words
 # --------------------------------------------------------------------------
-FILE_LINE = re.compile(r"^(?:\./)?(.+?\.(?:tex|cls|sty|bib|bst|clo|def|cfg)):(\d+): (.*)$")
+FILE_LINE = re.compile(r"^(?:\./)?(.+?\.(?:tex|cls|sty|bib|bst|clo|def|cfg|aux|toc|lof|lot|loi|"
+                       r"bbl|ind|out|nav)):(\d+): (.*)$")
+AUX_FILE = re.compile(r"\.(aux|toc|lof|lot|loi|bbl|ind|out|nav)$")
 
 
 _ROOT = [""]
@@ -587,6 +610,10 @@ def parse_log(log):
             err = {"message": full.strip(), "hint": _hint(full)}
             if m:
                 err["file"] = _rel(m.group(1))
+                if AUX_FILE.search(err["file"]):
+                    err["hint"] = ("Το σφάλμα είναι στο %s, ένα βοηθητικό αρχείο που έγραψε "
+                                   "προηγούμενο compile (π.χ. με άλλη μηχανή). Πάτα «Καθαρό "
+                                   "compile»." % err["file"])
                 err["line"] = int(m.group(2))
             if context:
                 err["context"] = re.sub(r"\^\^[IM]", " ", context).strip()[:200]
