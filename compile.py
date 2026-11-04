@@ -26,6 +26,7 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -99,6 +100,21 @@ def _popen_kwargs():
     return kw
 
 
+def _kill_tree(p):
+    """End a step and everything it started (e.g. XeLaTeX and its xdvipdfmx)."""
+    try:
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                           capture_output=True, **_popen_kwargs())
+        else:
+            os.killpg(p.pid, signal.SIGTERM)
+    except Exception:
+        try:
+            p.kill()
+        except Exception:
+            pass
+
+
 def find_tex():
     engines = {e: which(e) for e, _ in ENGINES}
     engines = {e: p for e, p in engines.items() if p}
@@ -133,6 +149,8 @@ class Compiler:
         self.pdf_bytes = None
         self.pdf_version = 0
         self.bib_failed = False
+        self.proc = None
+        self.cancelled = False
         pdf = self.path(self.base + ".pdf")
         if os.path.isfile(pdf):
             with open(pdf, "rb") as f:
@@ -223,15 +241,31 @@ class Compiler:
 
     def _run(self, cmd, label):
         self.step = label
+        kw = _popen_kwargs()
+        if sys.platform != "win32":
+            kw["start_new_session"] = True  # so Stop also ends xdvipdfmx etc.
         try:
-            p = subprocess.run(cmd, cwd=self.root, capture_output=True, text=True,
-                               errors="replace", timeout=RUN_TIMEOUT,
-                               stdin=subprocess.DEVNULL, **_popen_kwargs())
-            return p.returncode, p.stdout + p.stderr
-        except subprocess.TimeoutExpired:
-            return -1, "%s: timeout after %d s" % (label, RUN_TIMEOUT)
+            p = subprocess.Popen(cmd, cwd=self.root, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, **kw)
         except OSError as e:
             return -1, "%s: %s" % (label, e)
+        self.proc = p
+        try:
+            data, _ = p.communicate(timeout=RUN_TIMEOUT)
+            return p.returncode, data.decode("utf-8", "replace")
+        except subprocess.TimeoutExpired:
+            _kill_tree(p)
+            data, _ = p.communicate()
+            return -1, data.decode("utf-8", "replace") + "\n%s: σταμάτησε μετά από %d s" % (
+                label, RUN_TIMEOUT)
+        finally:
+            self.proc = None
+
+    def stop(self):
+        self.cancelled = True
+        p = self.proc
+        if p is not None and p.poll() is None:
+            _kill_tree(p)
 
     def compile(self, engine="xelatex", clean=False):
         with self.lock:
@@ -264,6 +298,7 @@ class Compiler:
                                "hint": "Εγκατάστησε TeX (δες την καρτέλα «TeX» της σελίδας) "
                                        "ή διάλεξε άλλη μηχανή."})
                 return
+            self.cancelled = False
             if clean:
                 self.clean()
             cmd = [exe, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error",
@@ -276,8 +311,11 @@ class Compiler:
                 rc, out = self._run(cmd, "%s, πέρασμα %d" % (name, n))
                 steps.append(name)
                 out_all.append(out)
+                if self.cancelled:
+                    errors = [{"message": "Το compile σταμάτησε (Διακοπή).", "hint": ""}]
+                    return
                 if rc != 0:
-                    errors = self._locate(parse_log(self._read_log(), out))
+                    errors = self._explain(self._read_log(), out, engine)
                     return
                 if self._needs_bibtex() and self.tex["bibtex"] and (
                         not ran_bibtex and (
@@ -288,6 +326,9 @@ class Compiler:
                     rc, out = self._run([self.tex["bibtex"], self.base], "BibTeX")
                     steps.append("BibTeX")
                     out_all.append(out)
+                    if self.cancelled:
+                        errors = [{"message": "Το compile σταμάτησε (Διακοπή).", "hint": ""}]
+                        return
                     ran_bibtex = True
                     self.bib_failed = rc >= 2
                     if self.bib_failed:
@@ -311,13 +352,109 @@ class Compiler:
         except Exception as e:  # never leave the page stuck on "running"
             errors = [{"message": "Απρόσμενο σφάλμα: %s" % e, "hint": ""}]
         finally:
-            log_tail = "\n".join(self._read_log().splitlines()[-400:]) or "\n".join(out_all)[-20000:]
+            log_tail = "\n".join(self._read_log().splitlines()[-400:])
+            if out_all:
+                tail = "\n".join(out_all[-1].splitlines()[-80:])
+                log_tail += ("\n\n----- Έξοδος του τελευταίου βήματος "
+                             "(τελευταίες γραμμές) -----\n" + tail)
             self.result = {"ok": ok and not errors, "engine": engine, "steps": steps,
                            "seconds": round(time.time() - self.started, 1),
                            "errors": errors, "warnings": warnings, "log": log_tail,
                            "stamp": stamp, "finished": time.time()}
             self.running = False
             self.step = ""
+
+    def _explain(self, log, out, engine):
+        errors = parse_log(log)
+        if errors:
+            return self._locate(errors)
+        # Nothing in the log: the engine or the PDF driver stopped on its own.
+        # What it said is in its output, not in the log.
+        lines = [l.strip() for l in out.splitlines() if l.strip()]
+        text = log + "\n" + out
+        driver = [l for l in lines if re.search(
+            r"xdvipdfmx:fatal|\*\* ERROR \*\*|Image format conversion|PSfile|[Gg]hostscript|"
+            r"rungs|gswin|mgs\.exe", l)]
+        miktex = [l for l in lines if re.search(
+            r"did not succeed|major issue|required file|could not be installed|MiKTeX", l)]
+        eps = self._eps_used()
+        for f in re.findall(r"File: (\S+?\.eps) Graphic file \(type eps\)", text, re.I):
+            if not any(os.path.normcase(f) == os.path.normcase(x["eps"]) for x in eps):
+                eps.append({"eps": f})
+        # XeLaTeX hands .eps figures to Ghostscript while it writes the PDF; when
+        # that fails, XeLaTeX just stops, with nothing in the log.
+        if eps and (driver or "xdvipdfmx" in text or engine == "xelatex"):
+            first = eps[0]
+            detail = (driver or miktex)[-1:] 
+            e = {"message": ("Το compile σταμάτησε στη μετατροπή της εικόνας %s. Οι εικόνες "
+                             ".eps θέλουν Ghostscript, που δεν βρέθηκε ή απέτυχε." % first["eps"])
+                            + ((" (%s)" % detail[0][:160]) if detail else ""),
+                 "hint": ("Μετάτρεψέ την μία φορά σε .pdf ή .png (π.χ. με έναν online μετατροπέα "
+                          "EPS σε PDF), βάλ' τη στο figures/ και άλλαξε την κατάληξη στο "
+                          "\\includegraphics. Αλλιώς εγκατάστησε Ghostscript "
+                          "(ghostscript.com) και ξαναπάτα Compile.")}
+            for k in ("file", "line", "context"):
+                if k in first:
+                    e[k] = first[k]
+            return [e]
+        if miktex:
+            return [{"message": " ".join(miktex[:3])[:400],
+                     "hint": ("Άνοιξε το MiKTeX Console: Updates → ενημέρωσε όλα, και Settings → "
+                              "«Always install missing packages on-the-fly». Μετά πάτα "
+                              "«Καθαρό compile».")}]
+        return [{"message": "Η μηχανή σταμάτησε χωρίς μήνυμα στο log. Οι τελευταίες γραμμές που "
+                            "έγραψε:",
+                 "context": "\n".join((driver or lines)[-6:])[:600],
+                 "hint": "Δοκίμασε «Καθαρό compile» ή άλλη μηχανή. Το πλήρες log είναι παρακάτω."}]
+
+    def _eps_used(self):
+        """\\includegraphics of .eps files: by extension, or a name with only an .eps file."""
+        found = []
+        pat = re.compile(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}")
+        for base, dirs, files in os.walk(self.root):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+            for f in sorted(files):
+                if not f.endswith(".tex"):
+                    continue
+                full = os.path.join(base, f)
+                try:
+                    with open(full, encoding="utf-8", errors="replace") as fh:
+                        for n, line in enumerate(fh, 1):
+                            for m in pat.finditer(line.split("%")[0]):
+                                name = m.group(1).strip()
+                                stem, ext = os.path.splitext(name)
+                                if ext.lower() == ".eps":
+                                    hit = name
+                                elif not ext and os.path.isfile(self.path(name + ".eps")) and not any(
+                                        os.path.isfile(self.path(name + x))
+                                        for x in (".pdf", ".png", ".jpg", ".jpeg")):
+                                    hit = name + ".eps"
+                                else:
+                                    continue
+                                found.append({"eps": hit, "line": n, "context": line.strip()[:200],
+                                              "file": _rel(os.path.relpath(full, self.root))})
+                except OSError:
+                    pass
+        return found
+
+    def _find_line(self, e, pat):
+        for base, dirs, files in os.walk(self.root):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+            for f in sorted(files):
+                if not f.endswith(".tex"):
+                    continue
+                full = os.path.join(base, f)
+                try:
+                    with open(full, encoding="utf-8", errors="replace") as fh:
+                        for n, line in enumerate(fh, 1):
+                            if pat.search(line.split("%")[0]):
+                                e["file"] = _rel(os.path.relpath(full, self.root))
+                                e["line"] = n
+                                e["context"] = line.strip()[:200]
+                                return True
+                except OSError:
+                    pass
+        return False
 
     def _locate(self, errors):
         """A missing file is reported without a line: find where it is asked for."""
@@ -328,26 +465,7 @@ class Compiler:
             name = re.escape(re.sub(r"\.(sty|cls)$", "", m.group(1)))
             pat = re.compile(r"\\(?:usepackage|RequirePackage|includegraphics|input|include)"
                              r"\s*(?:\[[^\]]*\])?\s*\{[^}]*\b" + name + r"(?:\.\w+)?\b")
-            for base, dirs, files in os.walk(self.root):
-                dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
-                for f in sorted(files):
-                    if not f.endswith(".tex"):
-                        continue
-                    full = os.path.join(base, f)
-                    try:
-                        with open(full, encoding="utf-8", errors="replace") as fh:
-                            for n, line in enumerate(fh, 1):
-                                if pat.search(line.split("%")[0]):
-                                    e["file"] = _rel(os.path.relpath(full, self.root))
-                                    e["line"] = n
-                                    e["context"] = line.strip()[:200]
-                                    break
-                    except OSError:
-                        pass
-                    if e.get("file"):
-                        break
-                if e.get("file"):
-                    break
+            self._find_line(e, pat)
         return errors
 
     def _bib_newer(self):
@@ -418,6 +536,10 @@ def _hint(msg):
     if "Unable to load picture" in msg or re.search(r"File `[^']+\.(png|jpe?g|pdf|eps)' not found", msg):
         return ("Δεν βρέθηκε η εικόνα. Έλεγξε το όνομα (και κεφαλαία/πεζά) και ότι είναι "
                 "στον φάκελο figures/, π.χ. \\includegraphics{figures/σχήμα.png}.")
+    if "-eps-converted-to.pdf" in msg:
+        return ("Μια εικόνα .eps δεν μετατράπηκε σε PDF: χρειάζεται Ghostscript. Μετάτρεψέ την μία "
+                "φορά σε .pdf ή .png και άλλαξε την κατάληξη στο \\includegraphics, ή εγκατάστησε "
+                "Ghostscript (ghostscript.com).")
     if "I can't write on file" in msg:
         return "Κλείσε το PDF στο πρόγραμμα που το έχεις ανοιχτό και ξαναπάτα Compile."
     if "Missing $ inserted" in msg:
@@ -434,8 +556,8 @@ def _hint(msg):
     return ""
 
 
-def parse_log(log, output=""):
-    lines = (log or output).splitlines()
+def parse_log(log):
+    lines = log.splitlines()
     errors = []
     i = 0
     while i < len(lines):
@@ -475,9 +597,6 @@ def parse_log(log, output=""):
         elif "xdvipdfmx:fatal" in line:
             errors.append({"message": line.strip(), "hint": ""})
         i += 1
-    if not errors:
-        errors.append({"message": "Το compile απέτυχε χωρίς συγκεκριμένο μήνυμα.",
-                       "hint": "Δες το πλήρες log παρακάτω."})
     # the first error is the real one; "Emergency stop" etc. only follow from it
     real = [e for e in errors if "Emergency stop" not in e["message"]
             and "job aborted" not in e["message"]]
@@ -560,6 +679,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
 .err .msg{margin:4px 0 0;font-weight:500}
 .err code{display:block;margin-top:6px;font:12.5px/1.45 var(--mono);background:var(--paper);border-radius:4px;padding:6px 8px;overflow-wrap:anywhere;white-space:pre-wrap}
 .err .hint{margin:6px 0 0;font-size:13.5px;color:var(--muted)}
+.slow{margin:-6px 0 0;font-size:13.5px;color:var(--muted)}
 .warn{font-size:13.5px;color:var(--muted)} .warn ul{margin:6px 0 0;padding-left:18px}
 details summary{cursor:pointer;color:var(--muted);font-size:13.5px}
 pre.log{font:11.5px/1.45 var(--mono);background:var(--tint);border-radius:6px;padding:10px;max-height:340px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -581,9 +701,11 @@ a{color:var(--brown-ink)}
   <div class="buttons">
     <button class="primary" id="go">Compile</button>
     <button id="clean" title="Σβήνει τα βοηθητικά αρχεία (.aux, .toc …) και κάνει compile από την αρχή">Καθαρό compile</button>
+    <button id="stop" hidden>Διακοπή</button>
   </div>
   <label class="auto"><input type="checkbox" id="auto"> Αυτόματο compile σε κάθε αποθήκευση</label>
   <div class="status" id="status"><span class="dot"></span><span id="statustext">Πάτα Compile.</span></div>
+  <p class="slow" id="slow" hidden></p>
   <div id="errors"></div>
   <div id="warnings"></div>
   <div class="buttons" id="pdfbtns" hidden>
@@ -622,6 +744,7 @@ function compile(clean) {
 }
 $("go").onclick = () => compile(false);
 $("clean").onclick = () => compile(true);
+$("stop").onclick = () => api("/api/stop", {}).then(draw).catch(() => {});
 $("auto").onchange = () => store.set("auto", $("auto").checked);
 
 function drawEngines(tex) {
@@ -663,6 +786,13 @@ function draw(s) {
   $("go").disabled = s.running || noTex;
   $("clean").disabled = s.running || noTex;
   $("go").textContent = s.running ? "Compile…" : "Compile";
+  $("stop").hidden = !s.running; $("clean").hidden = s.running;
+  if (s.running && s.elapsed > 40) {
+    $("slow").hidden = false;
+    $("slow").textContent = /MiKTeX/.test(s.tex.distribution)
+      ? "Την πρώτη φορά το MiKTeX κατεβάζει πακέτα και γραμματοσειρές· μπορεί να πάρει μερικά λεπτά. Αν ανοίξει παράθυρο του MiKTeX για εγκατάσταση πακέτου, πάτα «Install» (ίσως είναι πίσω από τον browser)."
+      : "Αργεί περισσότερο από το συνηθισμένο. Αν δεν προχωρά, πάτα Διακοπή.";
+  } else { $("slow").hidden = true; }
   const st = $("status"), r = s.result;
   st.className = "status " + (s.running ? "run" : r ? (r.ok ? "ok" : "fail") : "");
   if (s.running) {
@@ -768,6 +898,9 @@ def make_handler(comp, token, port):
                 data = json.loads(self.rfile.read(length) or b"{}")
             except ValueError:
                 data = {}
+            if urlparse(self.path).path == "/api/stop":
+                comp.stop()
+                return self._json(comp.state())
             if urlparse(self.path).path == "/api/compile":
                 engine = data.get("engine") if data.get("engine") in ENGINE_NAMES else "xelatex"
                 comp.compile(engine, bool(data.get("clean")))
