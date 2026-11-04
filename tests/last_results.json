@@ -1,12 +1,12 @@
 {
- "date": "2026-10-13 00:56",
+ "date": "2026-11-04 21:29",
  "tex": "pdfTeX 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian)",
  "python": "3.13.16",
  "results": [
   {
    "name": "01-shipped-main-pdflatex",
    "engines": "pdf",
-   "seconds": 5.3,
+   "seconds": 5.6,
    "pages": "70",
    "passed": true,
    "failures": []
@@ -14,7 +14,7 @@
   {
    "name": "02-all-features-pdflatex",
    "engines": "pdf",
-   "seconds": 14.4,
+   "seconds": 15.9,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -22,7 +22,7 @@
   {
    "name": "03-all-features-xelatex-bare-latin",
    "engines": "xe",
-   "seconds": 10.4,
+   "seconds": 10.2,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -30,7 +30,7 @@
   {
    "name": "04-all-features-lualatex-bare-latin",
    "engines": "lua",
-   "seconds": 20.6,
+   "seconds": 22.3,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -38,7 +38,7 @@
   {
    "name": "05-classic-pdflatex",
    "engines": "pdf",
-   "seconds": 14.0,
+   "seconds": 17.3,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -46,7 +46,7 @@
   {
    "name": "06-classic-xelatex",
    "engines": "xe",
-   "seconds": 11.0,
+   "seconds": 13.0,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -54,7 +54,7 @@
   {
    "name": "07-printer-nohyperref-xelatex",
    "engines": "xe",
-   "seconds": 9.5,
+   "seconds": 9.8,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -62,7 +62,7 @@
   {
    "name": "08-minimal-options-pdflatex",
    "engines": "pdf",
-   "seconds": 11.8,
+   "seconds": 12.4,
    "pages": "79",
    "passed": true,
    "failures": []
@@ -70,7 +70,7 @@
   {
    "name": "09-two-authors-long-title-xelatex",
    "engines": "xe",
-   "seconds": 10.8,
+   "seconds": 10.0,
    "pages": "78",
    "passed": true,
    "failures": []
@@ -78,7 +78,7 @@
   {
    "name": "10-two-authors-long-title-pdflatex",
    "engines": "pdf",
-   "seconds": 14.8,
+   "seconds": 15.2,
    "pages": "78",
    "passed": true,
    "failures": []
@@ -86,7 +86,7 @@
   {
    "name": "11-tikz-cover-pdflatex",
    "engines": "pdf",
-   "seconds": 14.1,
+   "seconds": 14.3,
    "pages": "78",
    "passed": true,
    "failures": []
@@ -94,7 +94,7 @@
   {
    "name": "12-tikz-cover-lualatex",
    "engines": "lua",
-   "seconds": 20.7,
+   "seconds": 23.0,
    "pages": "78",
    "passed": true,
    "failures": []
@@ -102,7 +102,7 @@
   {
    "name": "13-font-override-xelatex",
    "engines": "xe",
-   "seconds": 10.1,
+   "seconds": 11.6,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -110,7 +110,7 @@
   {
    "name": "14-stale-aux-pdflatex-then-xelatex",
    "engines": "pdf->xe",
-   "seconds": 20.7,
+   "seconds": 23.1,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -118,7 +118,7 @@
   {
    "name": "15-stale-aux-xelatex-then-pdflatex",
    "engines": "xe->pdf",
-   "seconds": 21.2,
+   "seconds": 21.4,
    "pages": "80",
    "passed": true,
    "failures": []
@@ -134,7 +134,7 @@
   {
    "name": "17-shipped-main-lualatex",
    "engines": "lua",
-   "seconds": 8.5,
+   "seconds": 8.9,
    "pages": "70",
    "passed": true,
    "failures": []
@@ -142,7 +142,7 @@
   {
    "name": "18-latin-name-only-no-cover-xelatex",
    "engines": "xe",
-   "seconds": 10.2,
+   "seconds": 10.4,
    "pages": "78",
    "passed": true,
    "failures": []
@@ -150,7 +150,7 @@
   {
    "name": "19-latin-name-only-no-cover-pdflatex",
    "engines": "pdf",
-   "seconds": 13.4,
+   "seconds": 14.9,
    "pages": "78",
    "passed": true,
    "failures": []
