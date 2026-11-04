@@ -46,10 +46,15 @@ jobs:
 
       - name: Make the figures of the black-and-white copy grey too
         run: |
+          # main-bw.pdf was written by the TeX container: make it readable here
+          sudo chmod a+r main-bw.pdf
           command -v gs > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ghostscript > /dev/null; }
-          gs -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite \
+          gs -q -dNOPAUSE -dBATCH -dSAFER --permit-file-read="$PWD/" -sDEVICE=pdfwrite \
             -sColorConversionStrategy=Gray -dProcessColorModel=/DeviceGray \
-            -dCompatibilityLevel=1.5 -o thesis-bw.pdf main-bw.pdf
+            -dCompatibilityLevel=1.5 -o "$PWD/thesis-bw.pdf" "$PWD/main-bw.pdf" || {
+            echo "::warning::Ghostscript failed: thesis-bw.pdf has the template in grey but the figures as they are."
+            cp main-bw.pdf thesis-bw.pdf
+          }
 
       - name: Keep the PDFs with this run
         uses: actions/upload-artifact@v4
