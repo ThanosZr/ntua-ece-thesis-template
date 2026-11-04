@@ -38,23 +38,27 @@ jobs:
       - name: Name the PDF
         run: cp main.pdf thesis.pdf
 
-      - name: Compile main-bw.tex (black and white) with XeLaTeX
+      - name: Compile main-bw.tex (black and white) with XeLaTeX, figures in grey
         uses: xu-cheng/latex-action@v3
         with:
           root_file: main-bw.tex
           latexmk_use_xelatex: true
+          # Ghostscript runs inside the TeX container: the runner's own
+          # Ghostscript is not allowed to read the PDF the container wrote.
+          extra_system_packages: ghostscript
+          post_compile: >-
+            gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite
+            -sColorConversionStrategy=Gray -dProcessColorModel=/DeviceGray
+            -dCompatibilityLevel=1.5 -o thesis-bw.pdf main-bw.pdf
+            || { echo "::warning::Ghostscript failed: thesis-bw.pdf has the template in grey but the figures as they are.";
+                 cp main-bw.pdf thesis-bw.pdf; }
 
-      - name: Make the figures of the black-and-white copy grey too
+      - name: Make sure the black-and-white PDF is there
         run: |
-          # main-bw.pdf was written by the TeX container: make it readable here
-          sudo chmod a+r main-bw.pdf
-          command -v gs > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ghostscript > /dev/null; }
-          gs -q -dNOPAUSE -dBATCH -dSAFER --permit-file-read="$PWD/" -sDEVICE=pdfwrite \
-            -sColorConversionStrategy=Gray -dProcessColorModel=/DeviceGray \
-            -dCompatibilityLevel=1.5 -o "$PWD/thesis-bw.pdf" "$PWD/main-bw.pdf" || {
-            echo "::warning::Ghostscript failed: thesis-bw.pdf has the template in grey but the figures as they are."
+          if [ ! -f thesis-bw.pdf ]; then
+            echo "::warning::thesis-bw.pdf has the template in grey but the figures as they are."
             cp main-bw.pdf thesis-bw.pdf
-          }
+          fi
 
       - name: Keep the PDFs with this run
         uses: actions/upload-artifact@v4
