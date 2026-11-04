@@ -62,6 +62,22 @@
 
 ## Τοπικά (TeX Live 2023+ ή MiKTeX)
 
+### Offline compiler
+
+```bash
+python compile.py
+```
+
+Ανοίγει στον browser μια σελίδα με κουμπί **Compile**, τα σφάλματα με το αρχείο
+και τη γραμμή τους, και το PDF δίπλα. Μπορεί να κάνει compile μόνο του σε κάθε
+αποθήκευση. Στα Windows ανοίγει και με διπλό κλικ. Θέλει Python 3.7+ (μόνο τη
+βασική βιβλιοθήκη) και εγκατεστημένο TeX: [MiKTeX](https://miktex.org/download)
+ή [TeX Live](https://tug.org/texlive/), ή [MacTeX](https://tug.org/mactex/) στο
+macOS. Αν δεν βρει TeX, λέει τι να εγκαταστήσετε. Χωρίς σελίδα:
+`python compile.py --once` (επιλογές: `--engine pdflatex`, `--clean`).
+
+### Από τερματικό
+
 ```bash
 latexmk -xelatex main.tex     # προτείνεται
 latexmk -pdf main.tex         # pdfLaTeX

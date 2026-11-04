@@ -131,6 +131,8 @@
     text-align: center; }
   ol.flow b { display: block; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
   .route .note { margin: 0 0 14px; }
+  .route-action { margin: 4px 0 12px; }
+  .route-action .btn { padding: 10px 16px; font-size: 15px; }
   kbd { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 4px;
     padding: 0 0.4em; }
   h3.sub { font-size: 20px; margin: 48px 0 8px; scroll-margin-top: 16px; }
@@ -260,16 +262,21 @@
           <p class="note">Χωρίς εγκατάσταση. Στα ιδιωτικά repositories κάθε compile
             μετράει στα δωρεάν λεπτά του μήνα του λογαριασμού σου.</p>
         </div>
-        <div class="route">
+        <div class="route" id="offline">
           <h3>Στον υπολογιστή σου <span class="tag">και offline</span></h3>
           <ol class="flow">
             <li><div><b>Παίρνεις το πρότυπο</b><a href="overleaf-template.zip" download>Λήψη ZIP</a>
-              και εγκατάσταση TeX Live 2023 ή νεότερου, ή MiKTeX.</div></li>
-            <li><div><b>Γράφεις</b>Σε όποιον editor θες. Το VS Code με την επέκταση LaTeX Workshop
-              δείχνει το PDF δίπλα στον κώδικα.</div></li>
-            <li><div><b>Βγάζεις το PDF</b>Στον φάκελο του προτύπου:
-              <code>latexmk&nbsp;-xelatex&nbsp;main.tex</code> και βγαίνει το <code>main.pdf</code>.</div></li>
+              και, μία φορά, εγκατάσταση TeX: <a href="https://miktex.org/download">MiKTeX</a> ή
+              <a href="https://tug.org/texlive/">TeX Live</a> (Windows, Linux),
+              <a href="https://tug.org/mactex/">MacTeX</a> (macOS).</div></li>
+            <li><div><b>Γράφεις</b>Σε όποιον editor θες, π.χ. VS Code ή Notepad++.</div></li>
+            <li><div><b>Βγάζεις το PDF</b>Άνοιξε τον offline compiler: <code>python&nbsp;compile.py</code>
+              στον φάκελο του προτύπου (στα Windows και με διπλό κλικ). Ανοίγει στον browser, με κουμπί
+              <strong>Compile</strong>, τα σφάλματα με τη γραμμή τους και το PDF δίπλα.</div></li>
           </ol>
+          <p class="route-action"><a class="btn ghost" href="compile.py" download>Offline compiler</a></p>
+          <p class="note">Το <code>compile.py</code> υπάρχει ήδη μέσα στο ZIP. Θέλει <a href="https://www.python.org/downloads/">Python</a>
+            3.7 ή νεότερη, χωρίς τίποτε άλλο. Αν προτιμάς τερματικό: <code>latexmk&nbsp;-xelatex&nbsp;main.tex</code>.</p>
         </div>
       </div>
 

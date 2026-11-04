@@ -32,7 +32,7 @@ FULL_OPTS = "modern,hyperref,watermark,histinit,newlogo"
 ENGINES = [("pdf", "pdfLaTeX", "pdflatex"), ("xe", "XeLaTeX", "xelatex"),
            ("lua", "LuaLaTeX", "lualatex")]
 TEMPLATE_FILES = ["main.tex", "ntua-thesis.cls", "ntua.bst", "references.bib",
-                  "LICENSE", "README.md"]
+                  "compile.py", "LICENSE", "README.md"]
 TEMPLATE_DIRS = ["front_matter", "body_matter", "back_matter", "figures", "logo"]
 
 DESCRIPTIONS = {
@@ -86,6 +86,8 @@ def with_options(dest, opts):
 
 # --------------------------------------------------------------------------
 def build_zip():
+    # the page's "Offline compiler" button downloads this copy
+    shutil.copyfile(os.path.join(ROOT, "compile.py"), os.path.join(DOCS, "compile.py"))
     out = os.path.join(DOCS, "overleaf-template.zip")
     with tempfile.TemporaryDirectory() as tmp:
         copy_template(tmp)
