@@ -169,6 +169,7 @@
         <div class="actions">
           <a class="btn primary" id="open-overleaf" href="#start">Άνοιγμα στο Overleaf</a>
           <a class="btn ghost" href="overleaf-template.zip" download>Λήψη ZIP</a>
+          <a class="btn ghost" id="sample-pdf" href="#github-build">Δείγμα PDF</a>
         </div>
         <p class="note" id="overleaf-note">Δημιουργεί νέο project στο Overleaf με το πρότυπο και XeLaTeX ήδη επιλεγμένο.</p>
       </div>
@@ -220,6 +221,19 @@ latexmk -lualatex main.tex  # LuaLaTeX</code></pre>
   ItalicFont=*ti, BoldItalicFont=*bi]</code></pre>
         </div>
       </div>
+      <h3 id="github-build">Στο GitHub, χωρίς εγκατάσταση</h3>
+      <ol class="steps">
+        <li>Στο GitHub του προτύπου πάτα <strong>Use this template → Create a new repository</strong>.
+          Μπορείς να το κάνεις ιδιωτικό.</li>
+        <li>Γράψε την εργασία σου στα αρχεία: στον browser (πάτα το πλήκτρο <code>.</code> στη σελίδα
+          του repo και ανοίγει editor) ή στον υπολογιστή σου με <code>git</code>.</li>
+        <li>Σε κάθε commit, το <strong>Actions → Build PDF</strong> κάνει compile με XeLaTeX
+          και πλήρες TeX Live, σε λίγα λεπτά.</li>
+        <li>Το PDF το κατεβάζεις από τα <strong>Releases → pdf → thesis.pdf</strong>,
+          ή από το run στο Actions, στα <strong>Artifacts</strong>.</li>
+      </ol>
+      <p class="note">Τα GitHub Actions είναι δωρεάν στα δημόσια repositories· στα ιδιωτικά
+        ισχύει το μηνιαίο δωρεάν όριο λεπτών του λογαριασμού σου.</p>
     </section>
 
     <section class="block" id="fixes">
@@ -299,6 +313,8 @@ latexmk -lualatex main.tex  # LuaLaTeX</code></pre>
       '<a href="' + gh + '/issues">Issues</a>. Για να τρέξεις τους ελέγχους: ' +
       "<code>python3 tests/run_tests.py</code>.";
     nav.href = gh;
+    var pdf = document.getElementById("sample-pdf");
+    if (pdf) pdf.href = gh + "/releases/download/pdf/thesis.pdf";
   } else {
     urlEl.innerHTML = '<span class="missing">github.com/ΧΡΗΣΤΗΣ/REPO</span>';
     textEl.innerHTML = "Ο σύνδεσμος εμφανίζεται αυτόματα όταν η σελίδα δημοσιευτεί στο " +
